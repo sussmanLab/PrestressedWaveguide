@@ -1,4 +1,4 @@
-# PrestressMetamaterials
+# PrestressedWaveguide
 
 Placeholder readme.
 

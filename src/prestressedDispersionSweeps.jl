@@ -59,7 +59,7 @@ function run_dispersion_sweep(
     is_long = (polarization == Long)
     
     case_name = (is_x ? "x" : "y") * (is_long ? "Longitudinal" : "Transverse")
-    filename = joinpath(output_dir, "$(case_name)_np$(nPrimary)_ns$(nSecondary)_S$(S).txt")
+    filename = joinpath(output_dir, "$(case_name)_np$(nPrimary)_ns$(nSecondary)_S$(S)_dt$(dt).txt")
     mkpath(output_dir)
 
     val_dir = is_x ? Val(DirX) : Val(DirY)
@@ -72,7 +72,7 @@ function run_dispersion_sweep(
         @printf("%4s | %8s | %11s | %11s | %14s | %7s\n", "Mode", "k", "ω_th", "vg_th", "vg_sim", "% Err")
         println("-----|----------|-------------|-------------|----------------|--------")
 
-        range_modes = div(nPrimary, 2):-1:2
+        range_modes = (div(nPrimary, 2) - 1) :-1:2
 
         for modeIdx in range_modes
             nx = is_x ? nPrimary : nSecondary
