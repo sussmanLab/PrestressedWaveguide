@@ -17,14 +17,12 @@ end
 Calculates the force between particles `i` and `j` and updates their
 accelerations according to Newton's third law. 
 """
-function _apply_force_pair!(accelerations, i, j, system, force)
+@inline function _apply_force_pair!(accelerations, i, j, system, force)
     p1 = system.particles[i]
     p2 = system.particles[j]
 
     r_vector = box_displacement(system.boundary_conditions, p1.position, p2.position)
 
-    # 2. Pass this vector to the force function
-    # The force function calculates the force ON p1 FROM p2
     f_on_p1 = force(r_vector)
 
     accelerations[i] += f_on_p1 / p1.mass
@@ -41,20 +39,11 @@ function compute_acceleration!(accelerations::Vector{SVector{D,T}}, system::Part
     fill!(accelerations, zero(SVector{D,T}))
 
     for bond in calculator.bonds
-        p1 = system.particles[bond.i]
-        p2 = system.particles[bond.j]
-
-        r_vector = box_displacement(system.boundary_conditions, p1.position, p2.position)
-
-        f_on_p1 = spring_force(bond.spring, r_vector)
-
-        accelerations[bond.i] += f_on_p1 / p1.mass
-        accelerations[bond.j] -= f_on_p1 / p2.mass
+        _apply_force_pair!(accelerations, bond.i, bond.j, system, r -> spring_force(bond.spring, r))
     end
     
     return nothing
 end
-
 
 function potential_energy(system::ParticleSystem{D,T,BC}, calculator::FixedTopologyCalculator{B}) where {D,T,BC,B}
     pe = 0.0

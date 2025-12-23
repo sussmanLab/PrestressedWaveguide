@@ -1,6 +1,6 @@
 module PrestressedWaveguide
 
-using StaticArrays, Random
+using StaticArrays, Random, Printf
 using Base.Threads
 using DelimitedFiles
 
@@ -9,6 +9,7 @@ export Particle, ParticleSystem, PeriodicBoundaryConditions, box_displacement, a
 export VerletIntegrator, FixedTopologyCalculator, compute_acceleration!, integrate!
 export OneDChainLattice, SimpleTriangularLattice, WaveguideLattice, imposeTravelingWavePacket!, imposeTravelingWave!, imposeWave!
 export run_simulation!, measure_wave_properties, calculate_pseudomomentum_density, average_energy_density
+export run_dispersion_sweep, measure_all_fluxes
 
 include("forceLaws.jl")
 
@@ -21,5 +22,7 @@ include("integrators.jl")
 include("simulator.jl")
 
 include("waveMeasurements.jl")
+
+include("prestressedDispersionSweeps.jl")
 
 end # module PrestressedWaveguide
