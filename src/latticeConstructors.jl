@@ -179,3 +179,86 @@ function WaveguideLattice(nx, ny, kB, Sxx)
 
     return system, FixedTopologyCalculator(bonds)
 end
+
+"""
+    imposeWave!(system, modeIndexX, modeIndexY, Ax, Ay)
+
+Modifies the positions of particles to set up a static displacement wave.
+Updates `system.particles` in place.
+""" 
+function imposeWave!(system::ParticleSystem{D,T,B}, modeIndexX, modeIndexY, Ax, Ay) where {D,T,B}
+    L = system.boundary_conditions.box_dimensions
+    
+    qx = 2.0 * pi * modeIndexX / L[1]
+    qy = 2.0 * pi * modeIndexY / L[2]
+
+    for i in eachindex(system.particles)
+        p = system.particles[i]
+        phase = qx * p.position[1] + qy * p.position[2]
+        displacement = SVector{D,T}(Ax * cos(phase), Ay * cos(phase))
+        new_position = p.position + displacement
+        system.particles[i] = Particle(new_position, p.velocity, p.mass)
+    end
+end
+
+"""
+    imposeTravelingWave!(system, modeIndexX, modeIndexY, Ax, Ay, omega)
+
+Modifies positions and velocities to set up a traveling wave.
+"""
+function imposeTravelingWave!(system::ParticleSystem{D,T,B}, modeIndexX, modeIndexY, Ax, Ay, omega) where {D,T,B}
+    L = system.boundary_conditions.box_dimensions
+    
+    qx = 2.0 * pi * modeIndexX / L[1]
+    qy = 2.0 * pi * modeIndexY / L[2]
+
+    for i in eachindex(system.particles)
+        p = system.particles[i]
+        phase = qx * p.position[1] + qy * p.position[2]
+        displacement = SVector{D,T}(Ax * cos(phase), Ay * cos(phase))
+        new_position = p.position + displacement
+        new_velocity = SVector{D,T}(omega * Ax * sin(phase), omega * Ay * sin(phase))
+        system.particles[i] = Particle(new_position, new_velocity, p.mass)
+    end
+end
+
+"""
+    imposeTravelingWavePacket!(system, modeIndexX, modeIndexY, Ax, Ay, omega, sigmaX, sigmaY)
+
+Modifies positions and velocities to set up a Gaussian wave packet centered in the box.
+Adds the wave velocity to any existing velocity rather than overwriting it.
+"""
+function imposeTravelingWavePacket!(system::ParticleSystem{D,T,B}, modeIndexX, modeIndexY, Ax, Ay, omega, sigmaX, sigmaY) where {D,T,B}
+    L = system.boundary_conditions.box_dimensions
+    
+    qx = 2.0 * pi * modeIndexX / L[1]
+    qy = 2.0 * pi * modeIndexY / L[2]
+    
+    centerX = L[1] / 2.0
+    centerY = L[2] / 2.0
+
+    for i in eachindex(system.particles)
+        p = system.particles[i]
+        
+        posx = p.position[1]
+        posy = p.position[2]
+        phase = qx * posx + qy * posy
+
+        gaussianEnvelopeArg = 0.0
+        if sigmaX > 0.0
+            gaussianEnvelopeArg += ((posx - centerX)^2) / (2.0 * sigmaX^2)
+        end
+        if sigmaY > 0.0
+            gaussianEnvelopeArg += ((posy - centerY)^2) / (2.0 * sigmaY^2)
+        end
+        gaussianEnvelope = exp(-gaussianEnvelopeArg)
+
+        displacement = gaussianEnvelope * SVector{D,T}(Ax * cos(phase), Ay * cos(phase))
+        new_position = p.position + displacement
+
+        wave_velocity = gaussianEnvelope * SVector{D,T}(omega * Ax * sin(phase), omega * Ay * sin(phase))
+        new_velocity = p.velocity + wave_velocity
+
+        system.particles[i] = Particle(new_position, new_velocity, p.mass)
+    end
+end
