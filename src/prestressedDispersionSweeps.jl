@@ -124,7 +124,7 @@ function run_dispersion_sweep(
                    results.energy_current_density[1], results.energy_current_density[2]]
             writedlm(io, [row])
 
-            if err > error_threshold
+            if err > error_threshold && modeIdx < div(nPrimary, 4) 
                 println("    --> Divergence detected (>$(error_threshold)%). Halting track.")
                 break
             end
