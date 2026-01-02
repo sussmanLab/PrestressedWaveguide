@@ -9,10 +9,10 @@ Pkg.instantiate()
 using PrestressedWaveguide
 using Dates
 
-const N_PRIMARY = 250
+const N_PRIMARY = 200
 const N_SECONDARY = 20
-const AMPLITUDE = 1e-4
-const DT1 = 1e-2
+const AMPLITUDE = 1e-2
+const DT1 = 1e-3
 const DT2 = 1e-4
 
 println("==================================================")
