@@ -181,6 +181,97 @@ function WaveguideLattice(nx, ny, kB, Sxx)
 end
 
 """
+    BistableWaveguideLattice(nx, ny, kB, Sxx)
+
+Creates a triangular lattice with a mixture of harmonic springs and bistable springs, where the bistable springs have been chosen so that their linearization agrees with that of the WaveguideLattice above.
+We assume kB = Sxx = 1, and choose the B bond to be a normal harmonic spring. 
+We parameterize the A and C bistable springs in terms of the energy well depth of the bistable potential.
+Returns `(system, calculator)`.
+"""
+function WaveguideLattice(nx, ny, uA, uC)
+    if !iseven(ny)
+        ny += 1
+    end
+    kB = 1.0
+    rB = 0.0
+
+    r0A = 1.0
+    deltaA = 2.0 * sqrt(2.0*uA)
+
+    #positive-delta solution for linearization of C bond about sqrt(3)
+    function c_bond_helper(u) # bizarre result is an automated common sub-expr reduction
+        e1 = u^3
+        c226 = 4.0*u
+        c227 = -3.0 + c226
+        c228 = u*c227
+        c229 = 24.0 + c228
+        c230 = e1*c229
+        c238 = sqrt(c230)
+        c222 = u*u
+        c223 = 9.0 + u
+        c224 = c222*c223
+        c239 = 3.0*c238
+        c240 = c224 + c239
+        c243 = c240^(1/3)
+        c249 = c240^(2/3)
+        r0=(-14.0*e1 + 2.0*c238*c243 + 2.0*c222*(12.0 + 5.0*c243) - u*(2.0*c238 + 5.0*c249))/(sqrt(3.0)*u*c249)
+        delta=  2.0*sqrt(2.0)*sqrt((c222 + c249 - u*(6.0 + c243))/c243)
+
+        return (r0,delta)
+    end
+    (r0C, deltaC) = c_bond_helper(uC)
+
+    springA = BistableQuarticSpring(r0A, deltaA, uA)
+    springB = HarmonicSpring(kB, rB)
+    springC = BistableQuarticSpring(r0C, deltaC, uC)
+
+    y_spacing = 0.5 * sqrt(3.0)
+    positions = SVector{2,Float64}[]
+    
+    for j in 0:ny-1
+        x_offset = isodd(j) ? 0.5 : 0.0
+        for i in 0:nx-1
+            push!(positions, SVector(i + x_offset, j * y_spacing))
+        end
+    end
+    
+    N = length(positions)
+    box_dims = SVector{2,Float64}(Float64(nx), ny * y_spacing)
+    bc = PeriodicBoundaryConditions(box_dims)
+    
+    particles = [Particle(pos, zero(SVector{2,Float64}), 1.0) for pos in positions]
+    system = ParticleSystem(particles, bc)
+
+    BondType = Bond{HarmonicSpring{Float64}} 
+    bonds = Vector{BondType}()
+
+    function is_bond_vector(dr, target_vec; atol=0.1)
+        return isapprox(dr, target_vec; atol=atol) || isapprox(dr, -target_vec; atol=atol)
+    end
+
+    for i in 1:N-1
+        for j in i+1:N
+            dr = box_displacement(bc, particles[i].position, particles[j].position)
+
+            # Check Horizontal (Type A)
+            if is_bond_vector(dr, HORIZONTAL_BOND_VEC)
+                push!(bonds, Bond(i, j, springA))
+            
+            # Check Diagonals (Type B)
+            elseif is_bond_vector(dr, POSITIVE_DIAGONAL_BOND_VEC) || 
+                   is_bond_vector(dr, NEGATIVE_DIAGONAL_BOND_VEC)
+                push!(bonds, Bond(i, j, springB))
+            
+            # Check Vertical NNN (Type C)
+            elseif is_bond_vector(dr, VERTICAL_NNN_BOND_VEC)
+                push!(bonds, Bond(i, j, springC))
+            end
+        end
+    end
+
+    return system, FixedTopologyCalculator(bonds)
+end
+"""
     imposeWave!(system, modeIndexX, modeIndexY, Ax, Ay)
 
 Modifies the positions of particles to set up a static displacement wave.
