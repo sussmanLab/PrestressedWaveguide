@@ -1,6 +1,28 @@
 @enum PropagationDirection DirX DirY
 @enum Polarization Long Trans
 
+abstract type AbstractSystemConfig end
+
+struct LinearConfig <: AbstractSystemConfig
+    kB::Float64
+    S::Float64
+end
+
+struct BistableConfig <: AbstractSystemConfig
+    uA::Float64
+    uC::Float64
+    kB::Float64 # need to use default = 1.0 for now
+    S::Float64 # need to use default = 1.0 for now
+end
+
+function build_system(cfg::LinearConfig, nx::Int, ny::Int)
+    return WaveguideLattice(nx, ny, cfg.kB, cfg.S)
+end
+
+function build_system(cfg::BistableConfig, nx::Int, ny::Int)
+    return BistableWaveguideLattice(nx, ny, cfg.uA, cfg.uC)
+end
+
 """
 theory dispersion calculations as in the paper
 """
@@ -38,17 +60,33 @@ function theory_dispersion(::Val{DirY}, ::Val{Trans}, k, kB, S)
     return (omega_sq=omega_sq, vg=vg)
 end
 
+
+function calc_theory(cfg::LinearConfig, dir, pol, k)
+    return theory_dispersion(dir, pol, k, cfg.kB, cfg.S)
+end
+
+function calc_theory(cfg::BistableConfig, dir, pol, k)
+    return theory_dispersion(dir, pol, k, cfg.kB, cfg.S) 
+end
+
+function get_param_str(cfg::LinearConfig)
+    return "Harmonic_S$(cfg.S)"
+end
+
+function get_param_str(cfg::BistableConfig)
+    return "Bistable_S$(cfg.S)"
+end
 """
     run_dispersion_sweep(nPrimary, nSecondary, direction, polarization; kwargs...)
 
 Runs a sweep over wavenumbers to validate dispersion relations.
+Uses the WaveguideLattice constructor
 """
 function run_dispersion_sweep(
     nPrimary::Int, nSecondary::Int, 
     direction::PropagationDirection, 
-    polarization::Polarization;
-    kB::Float64=1.0, 
-    S::Float64=1.0, 
+    polarization::Polarization,
+    sys_config::AbstractSystemConfig;
     tMeasMultiples::Float64=4.0, 
     dt::Float64=1e-2, 
     amplitude::Float64=1e-4,
@@ -59,7 +97,9 @@ function run_dispersion_sweep(
     is_long = (polarization == Long)
     
     case_name = (is_x ? "x" : "y") * (is_long ? "Longitudinal" : "Transverse")
-    filename = joinpath(output_dir, "$(case_name)_np$(nPrimary)_ns$(nSecondary)_S$(S)_amp$(amplitude)_dt$(dt).txt")
+    param_str = get_param_str(sys_config)
+    
+    filename = joinpath(output_dir, "$(case_name)_np$(nPrimary)_ns$(nSecondary)_$(param_str)_amp$(amplitude)_dt$(dt).txt")
     mkpath(output_dir)
 
     val_dir = is_x ? Val(DirX) : Val(DirY)
@@ -78,13 +118,13 @@ function run_dispersion_sweep(
             nx = is_x ? nPrimary : nSecondary
             ny = is_x ? nSecondary : nPrimary
             
-            sys, calc = WaveguideLattice(nx, ny, kB, S)
+            sys, calc = build_system(sys_config, nx, ny)
             integrator = VerletIntegrator(sys, calc)
 
             L_dim = is_x ? sys.boundary_conditions.box_dimensions[1] : sys.boundary_conditions.box_dimensions[2]
             k = 2 * pi * modeIdx / L_dim
             
-            (omega_sq, vg_theory) = theory_dispersion(val_dir, val_pol, k, kB, S)
+            (omega_sq, vg_theory) = calc_theory(sys_config, val_dir, val_pol, k)
 
             if omega_sq < 1e-9 || abs(vg_theory) < 1e-3
                 continue
@@ -139,19 +179,43 @@ Parallel driver to run all 4 combinations (XL, XT, YL, YT) for a set of S parame
 """
 function measure_all_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
 
-    S_values = [1.0, -1.0]
+    harmonic_configs= [LinearConfig(1.0, 1.0), LinearConfig(1.0, -1.0)]
     combinations = Iterators.product(
         [DirX, DirY], 
         [Long, Trans], 
-        S_values
+        harmonic_configs
     )
     
-    tasks = map(combinations) do (dir, pol, S)
+    tasks = map(combinations) do (dir, pol, cfg)
         Threads.@spawn begin
-            println("Starting: $dir - $pol - S=$S on Thread $(Threads.threadid())")
+            println("Starting: $dir - $pol - $(get_param_str(cfg)) on Thread $(Threads.threadid())")
             run_dispersion_sweep(
-                nPrimary, nSecondary, dir, pol; 
-                S=S, amplitude=amplitude, dt=dt
+                nPrimary, nSecondary, dir, pol, cfg; 
+                amplitude=amplitude, dt=dt
+            )
+        end
+    end
+
+    foreach(wait, tasks)
+    println("All measurements complete.")
+end
+
+function measure_bistable_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
+
+    # uA and uC chosen so that δ ~ 0.75 of r0?
+    bistable_configs= [BistableConfig(0.0703125,0.7,1.0, 1.0)]
+    combinations = Iterators.product(
+        [DirX, DirY], 
+        [Long, Trans], 
+        bistable_configs
+    )
+    
+    tasks = map(combinations) do (dir, pol, cfg)
+        Threads.@spawn begin
+            println("Starting Bistable: $dir - $pol - $(get_param_str(cfg)) on Thread $(Threads.threadid())")
+            run_dispersion_sweep(
+                nPrimary, nSecondary, dir, pol, cfg; 
+                amplitude=amplitude, dt=dt
             )
         end
     end
