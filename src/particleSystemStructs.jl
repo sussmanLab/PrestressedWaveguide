@@ -35,6 +35,11 @@ struct PeriodicBoundaryConditions{D,T} <:AbstractBoundaryConditions
     box_dimensions::SVector{D,T}
 end
 
+struct LongitudinalConstraintBC{D,T} <: AbstractBoundaryConditions
+    box_dimensions::SVector{D,T}
+    longitudinal_dim::Int
+end
+
 struct SlidingWaveguideBCs{T} <: AbstractBoundaryConditions
     box_dimensions::SVector{2,T}
     sliding_dim::Int # 1 for x, 2 for y
@@ -61,6 +66,11 @@ function box_displacement(::OpenBoundaryConditions, p1_pos, p2_pos)
 end
 
 function box_displacement(bc::PeriodicBoundaryConditions{D,T}, p1_pos, p2_pos) where {D,T}
+    dr = p2_pos - p1_pos
+    return dr .- bc.box_dimensions .* round.(dr ./ bc.box_dimensions)
+end
+
+function box_displacement(bc::LongitudinalConstraintBC{D,T}, p1_pos, p2_pos) where {D,T}
     dr = p2_pos - p1_pos
     return dr .- bc.box_dimensions .* round.(dr ./ bc.box_dimensions)
 end
@@ -94,6 +104,23 @@ function apply_all_bcs!(system::ParticleSystem{D,T,PeriodicBoundaryConditions{D,
         wrapped_pos = p.position .- L .* floor.(p.position ./ L)
         
         system.particles[i] = Particle(wrapped_pos, p.velocity, p.mass)
+    end
+end
+
+function apply_all_bcs!(system::ParticleSystem{2,T,LongitudinalConstraintBC{2,T}}) where {T}
+    L = system.boundary_conditions.box_dimensions
+    l_dim = system.boundary_conditions.longitudinal_dim
+    for i in eachindex(system.particles)
+        p = system.particles[i]
+        wrapped_pos = p.position .- L .* floor.(p.position ./ L)
+        
+        if l_dim == 1
+            new_vel = SVector{2,T}(p.velocity[1], zero(T))
+        else
+            new_vel = SVector{2,T}(zero(T), p.velocity[2])
+        end
+        
+        system.particles[i] = Particle(wrapped_pos, new_vel, p.mass)
     end
 end
 

@@ -89,4 +89,30 @@
         @test sys.particles[2].velocity[1] ≈ 0.0
         @test sys.particles[3].velocity[1] ≈ 3.0
     end
+
+    @testset "LongitudinalConstraintBC" begin
+        box_dims = SVector(10.0, 10.0)
+        
+        bc_x = LongitudinalConstraintBC(box_dims, 1)
+        p1 = SVector(1.0, 1.0)
+        p2 = SVector(9.0, 9.0)
+        dr_x = box_displacement(bc_x, p1, p2)
+        @test dr_x ≈ SVector(-2.0, -2.0)
+        
+        p_test_x = Particle(SVector(11.5, -1.5), SVector(5.0, 3.0), 1.0)
+        sys_x = ParticleSystem([p_test_x], bc_x)
+        apply_all_bcs!(sys_x)
+        @test sys_x.particles[1].position ≈ SVector(1.5, 8.5)
+        @test sys_x.particles[1].velocity ≈ SVector(5.0, 0.0)
+        
+        bc_y = LongitudinalConstraintBC(box_dims, 2)
+        dr_y = box_displacement(bc_y, p1, p2)
+        @test dr_y ≈ SVector(-2.0, -2.0)
+        
+        p_test_y = Particle(SVector(11.5, -1.5), SVector(5.0, 3.0), 1.0)
+        sys_y = ParticleSystem([p_test_y], bc_y)
+        apply_all_bcs!(sys_y)
+        @test sys_y.particles[1].position ≈ SVector(1.5, 8.5)
+        @test sys_y.particles[1].velocity ≈ SVector(0.0, 3.0)
+    end
 end
