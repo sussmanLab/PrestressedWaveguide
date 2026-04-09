@@ -15,12 +15,12 @@ struct BistableConfig <: AbstractSystemConfig
     S::Float64 # need to use default = 1.0 for now
 end
 
-function build_system(cfg::LinearConfig, nx::Int, ny::Int)
-    return WaveguideLattice(nx, ny, cfg.kB, cfg.S)
+function build_system(cfg::LinearConfig, nx::Int, ny::Int; sliding_dim::Int=0)
+    return WaveguideLattice(nx, ny, cfg.kB, cfg.S; sliding_dim=sliding_dim)
 end
 
-function build_system(cfg::BistableConfig, nx::Int, ny::Int)
-    return BistableWaveguideLattice(nx, ny, cfg.uA, cfg.uC)
+function build_system(cfg::BistableConfig, nx::Int, ny::Int; sliding_dim::Int=0)
+    return BistableWaveguideLattice(nx, ny, cfg.uA, cfg.uC; sliding_dim=sliding_dim)
 end
 
 """
@@ -222,5 +222,128 @@ function measure_bistable_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, 
 
     foreach(wait, tasks)
     println("All measurements complete.")
+end
+
+"""
+    run_sliding_dispersion_sweep(nPrimary, nSecondary, direction, sys_config; kwargs...)
+
+Runs a sweep over wavenumbers for longitudinal waves with sliding boundary conditions.
+"""
+function run_sliding_dispersion_sweep(
+    nPrimary::Int, nSecondary::Int, 
+    direction::PropagationDirection, 
+    sys_config::AbstractSystemConfig;
+    tMeasMultiples::Float64=4.0, 
+    dt::Float64=1e-2, 
+    amplitude::Float64=1e-4,
+    error_threshold::Float64=95.0,
+    output_dir::String="slidingWaveguidePropagationResults"
+)
+    is_x = (direction == DirX)
+    polarization = Long
+    
+    case_name = (is_x ? "x" : "y") * "Longitudinal_Sliding"
+    param_str = get_param_str(sys_config)
+    
+    filename = joinpath(output_dir, "$(case_name)_np$(nPrimary)_ns$(nSecondary)_$(param_str)_amp$(amplitude)_dt$(dt).txt")
+    mkpath(output_dir)
+
+    val_dir = is_x ? Val(DirX) : Val(DirY)
+    val_pol = Val(Long)
+    
+    # sliding_dim is orthogonal to direction
+    s_dim = is_x ? 2 : 1
+
+    open(filename, "w") do io
+        writedlm(io, [["Mode", "k", "omega_theory", "vg_theory", "vg_x", "vg_y", "prho_x", "prho_y", "jE_x", "jE_y"]])
+
+        println("\n--- $case_name Modes ---")
+        @printf("%4s | %8s | %11s | %11s | %14s | %7s\n", "Mode", "k", "ω_th", "vg_th", "vg_sim", "% Err")
+        println("-----|----------|-------------|-------------|----------------|--------")
+
+        range_modes = (div(nPrimary, 2) - 1) :-1:2
+
+        for modeIdx in range_modes
+            nx = is_x ? nPrimary : nSecondary
+            ny = is_x ? nSecondary : nPrimary
+            
+            sys, calc = build_system(sys_config, nx, ny; sliding_dim=s_dim)
+            integrator = VerletIntegrator(sys, calc)
+
+            L_dim = is_x ? sys.boundary_conditions.box_dimensions[1] : sys.boundary_conditions.box_dimensions[2]
+            k = 2 * pi * modeIdx / L_dim
+            
+            (omega_sq, vg_theory) = calc_theory(sys_config, val_dir, val_pol, k)
+
+            if omega_sq < 1e-9 || abs(vg_theory) < 1e-3
+                continue
+            end
+            
+            omega_theory = sqrt(omega_sq)
+            period = 2 * pi / omega_theory
+            tMeas = tMeasMultiples * period
+
+            mx = is_x ? Float64(modeIdx) : 0.0
+            my = is_x ? 0.0 : Float64(modeIdx)
+            
+            Ax, Ay = 0.0, 0.0
+            if direction == DirX
+                Ax = amplitude
+                Ay = 0.0
+            else
+                Ax = 0.0
+                Ay = amplitude
+            end
+
+            results = measure_wave_properties(
+                sys, calc, integrator,
+                mx, my, Ax, Ay, omega_theory,
+                tMeas, dt; tSettle=0.0
+            )
+
+            measured_vg = is_x ? results.group_velocity[1] : results.group_velocity[2]
+            err = 100 * abs(measured_vg - vg_theory) / abs(vg_theory)
+
+            @printf("%4d | %8.4f | %11.4f | %11.4f | %14.4f | %6.2f%%\n", 
+                    modeIdx, k, omega_theory, vg_theory, measured_vg, err)
+            
+            row = [modeIdx, k, omega_theory, vg_theory, 
+                   results.group_velocity[1], results.group_velocity[2],
+                   results.momentum_density[1], results.momentum_density[2],
+                   results.energy_current_density[1], results.energy_current_density[2]]
+            writedlm(io, [row])
+
+            if err > error_threshold && modeIdx < div(nPrimary, 4) 
+                println("    --> Divergence detected (>$(error_threshold)%). Halting track.")
+                break
+            end
+        end
+    end
+end
+
+"""
+    measure_sliding_fluxes(; nPrimary=200, nSecondary=20, kwargs...)
+
+Parallel driver to run longitudinal combinations (XL, YL) with sliding boundaries.
+"""
+function measure_sliding_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
+    harmonic_configs = [LinearConfig(1.0, 1.0), LinearConfig(1.0, -1.0)]
+    combinations = Iterators.product(
+        [DirX, DirY], 
+        harmonic_configs
+    )
+    
+    tasks = map(combinations) do (dir, cfg)
+        Threads.@spawn begin
+            println("Starting Sliding: $dir - Long - $(get_param_str(cfg)) on Thread $(Threads.threadid())")
+            run_sliding_dispersion_sweep(
+                nPrimary, nSecondary, dir, cfg; 
+                amplitude=amplitude, dt=dt
+            )
+        end
+    end
+
+    foreach(wait, tasks)
+    println("All sliding measurements complete.")
 end
 

@@ -119,7 +119,7 @@ Creates a triangular lattice with specific prestressed bonds (A, B, C)
 assigned based on spatial orientation.
 Returns `(system, calculator)`.
 """
-function WaveguideLattice(nx, ny, kB, Sxx)
+function WaveguideLattice(nx, ny, kB, Sxx; sliding_dim::Int=0)
     if !iseven(ny)
         ny += 1
     end
@@ -145,7 +145,21 @@ function WaveguideLattice(nx, ny, kB, Sxx)
     
     N = length(positions)
     box_dims = SVector{2,Float64}(Float64(nx), ny * y_spacing)
-    bc = PeriodicBoundaryConditions(box_dims)
+    
+    if sliding_dim == 0
+        bc = PeriodicBoundaryConditions(box_dims)
+    else
+        p_dim = sliding_dim == 1 ? 2 : 1
+        s_dim = sliding_dim
+        
+        min_coord = minimum(p[s_dim] for p in positions)
+        max_coord = maximum(p[s_dim] for p in positions)
+        
+        side_1_idx = findall(p -> isapprox(p[s_dim], min_coord; atol=1e-5), positions)
+        side_2_idx = findall(p -> isapprox(p[s_dim], max_coord; atol=1e-5), positions)
+        
+        bc = SlidingWaveguideBCs(box_dims, s_dim, p_dim, side_1_idx, side_2_idx, min_coord, max_coord)
+    end
     
     particles = [Particle(pos, zero(SVector{2,Float64}), 1.0) for pos in positions]
     system = ParticleSystem(particles, bc)
@@ -188,7 +202,7 @@ We assume kB = Sxx = 1, and choose the B bond to be a normal harmonic spring.
 We parameterize the A and C bistable springs in terms of the energy well depth of the bistable potential.
 Returns `(system, calculator)`.
 """
-function BistableWaveguideLattice(nx, ny, uA, uC)
+function BistableWaveguideLattice(nx, ny, uA, uC; sliding_dim::Int=0)
     if !iseven(ny)
         ny += 1
     end
@@ -237,7 +251,21 @@ function BistableWaveguideLattice(nx, ny, uA, uC)
     
     N = length(positions)
     box_dims = SVector{2,Float64}(Float64(nx), ny * y_spacing)
-    bc = PeriodicBoundaryConditions(box_dims)
+    
+    if sliding_dim == 0
+        bc = PeriodicBoundaryConditions(box_dims)
+    else
+        p_dim = sliding_dim == 1 ? 2 : 1
+        s_dim = sliding_dim
+        
+        min_coord = minimum(p[s_dim] for p in positions)
+        max_coord = maximum(p[s_dim] for p in positions)
+        
+        side_1_idx = findall(p -> isapprox(p[s_dim], min_coord; atol=1e-5), positions)
+        side_2_idx = findall(p -> isapprox(p[s_dim], max_coord; atol=1e-5), positions)
+        
+        bc = SlidingWaveguideBCs(box_dims, s_dim, p_dim, side_1_idx, side_2_idx, min_coord, max_coord)
+    end
     
     particles = [Particle(pos, zero(SVector{2,Float64}), 1.0) for pos in positions]
     system = ParticleSystem(particles, bc)

@@ -35,6 +35,16 @@ struct PeriodicBoundaryConditions{D,T} <:AbstractBoundaryConditions
     box_dimensions::SVector{D,T}
 end
 
+struct SlidingWaveguideBCs{T} <: AbstractBoundaryConditions
+    box_dimensions::SVector{2,T}
+    sliding_dim::Int # 1 for x, 2 for y
+    periodic_dim::Int # 2 for y, 1 for x
+    side_1_indices::Vector{Int}
+    side_2_indices::Vector{Int}
+    side_1_coord::T
+    side_2_coord::T
+end
+
 struct ParticleSystem{D,T,B}
     particles::Vector{Particle{D,T}}
     boundary_conditions::B
@@ -52,10 +62,19 @@ end
 
 function box_displacement(bc::PeriodicBoundaryConditions{D,T}, p1_pos, p2_pos) where {D,T}
     dr = p2_pos - p1_pos
-    
-    # We subtract the box dimensions scaled by the nearest integer to dr ./ box_size
-    # This effectively wraps the vector components to range [-L/2, L/2]
     return dr .- bc.box_dimensions .* round.(dr ./ bc.box_dimensions)
+end
+
+function box_displacement(bc::SlidingWaveguideBCs{T}, p1_pos, p2_pos) where {T}
+    dr = p2_pos - p1_pos
+    p_dim = bc.periodic_dim
+    dp = dr[p_dim] - bc.box_dimensions[p_dim] * round(dr[p_dim] / bc.box_dimensions[p_dim])
+    
+    if p_dim == 1
+        return SVector{2,T}(dp, dr[2])
+    else
+        return SVector{2,T}(dr[1], dp)
+    end
 end
 
 """
@@ -75,6 +94,45 @@ function apply_all_bcs!(system::ParticleSystem{D,T,PeriodicBoundaryConditions{D,
         wrapped_pos = p.position .- L .* floor.(p.position ./ L)
         
         system.particles[i] = Particle(wrapped_pos, p.velocity, p.mass)
+    end
+end
+
+function apply_all_bcs!(system::ParticleSystem{2,T,SlidingWaveguideBCs{T}}) where {T}
+    bc = system.boundary_conditions
+    L = bc.box_dimensions
+    p_dim = bc.periodic_dim
+    s_dim = bc.sliding_dim
+    
+    for i in eachindex(system.particles)
+        p = system.particles[i]
+        
+        wrapped_p_pos = p.position[p_dim] - L[p_dim] * floor(p.position[p_dim] / L[p_dim])
+        
+        new_pos_p = wrapped_p_pos
+        new_pos_s = p.position[s_dim]
+        new_vel_s = p.velocity[s_dim]
+
+        if i in bc.side_1_indices
+            new_pos_s = bc.side_1_coord
+            new_vel_s = zero(T)
+        elseif i in bc.side_2_indices
+            new_pos_s = bc.side_2_coord
+            new_vel_s = zero(T)
+        end
+        
+        if p_dim == 1
+            system.particles[i] = Particle(
+                SVector{2,T}(new_pos_p, new_pos_s), 
+                SVector{2,T}(p.velocity[1], new_vel_s), 
+                p.mass
+            )
+        else
+            system.particles[i] = Particle(
+                SVector{2,T}(new_pos_s, new_pos_p), 
+                SVector{2,T}(new_vel_s, p.velocity[2]), 
+                p.mass
+            )
+        end
     end
 end
 

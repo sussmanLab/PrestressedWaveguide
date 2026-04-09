@@ -44,7 +44,7 @@ end
 
         measured_vg_x = results.group_velocity[1]
 
-        println("  L-Mode k=$(round(kx,digits=2)): Expected vg ≈ $(round(expected_vg,digits=4)), Got $(round(measured_vg_x,digits=4))")
+        # println("  L-Mode k=$(round(kx,digits=2)): Expected vg ≈ $(round(expected_vg,digits=4)), Got $(round(measured_vg_x,digits=4))")
 
         ratio_vg = results.energy_current_density[1] / results.energy_density
         @test isapprox(ratio_vg, measured_vg_x, atol=1e-3)
