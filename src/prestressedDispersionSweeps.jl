@@ -16,7 +16,8 @@ struct BistableConfig <: AbstractSystemConfig
 end
 
 function build_system(cfg::LinearConfig, nx::Int, ny::Int; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
-    return WaveguideLattice(nx, ny, cfg.kB, cfg.S; sliding_dim=sliding_dim, longitudinal_constraint_dim=longitudinal_constraint_dim)
+    Sxx_physical = cfg.S * cfg.kB / sqrt(3.0)
+    return WaveguideLattice(nx, ny, cfg.kB, Sxx_physical; sliding_dim=sliding_dim, longitudinal_constraint_dim=longitudinal_constraint_dim)
 end
 
 function build_system(cfg::BistableConfig, nx::Int, ny::Int; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
@@ -27,39 +28,46 @@ end
 theory dispersion calculations as in the paper
 """
 function theory_dispersion(::Val{DirX}, ::Val{Long}, k, kB, S)
-    omega_sq = 8.0 * sin(k / 4.0)^4
-    vg = sin(k / 2.0) / sqrt(2.0)
+    # from Eq S35
+    omega_sq = kB * 8.0 * sin(k / 4.0)^4
+    vg = sqrt(kB) * sin(k / 2.0) / sqrt(2.0)
     return (omega_sq=omega_sq, vg=vg)
 end
 
 function theory_dispersion(::Val{DirX}, ::Val{Trans}, k, kB, S)
-    omega_sq = 8.0 * sin(k / 4.0)^2
-    vg = cos(k / 4.0) / sqrt(2.0)
+    # from Eq S36
+    s_half = sin(k / 2.0)
+    c_half = cos(k / 2.0)
+    
+    omega_sq = 2.0 * kB * ( (S - 1.0) * s_half^2 + 2.0 * (1.0 - c_half) )
+    omega = omega_sq > 1e-9 ? sqrt(omega_sq) : 0.0
+    
+    vg_num = 2.0 * kB * ( (S - 1.0) * s_half * c_half + s_half )
+    vg = omega > 1e-9 ? vg_num / (2.0 * omega) : 0.0
+    
     return (omega_sq=omega_sq, vg=vg)
 end
 
 function theory_dispersion(::Val{DirY}, ::Val{Long}, k, kB, S)
-    omega_sq = 8.0 * sin(sqrt(3.0) * k / 4.0)^4
-    vg = sqrt(3.0/2.0) * sin(sqrt(3.0) * k / 2.0)
+    # from Eq S38
+    omega_sq = kB * 8.0 * sin(sqrt(3.0) * k / 4.0)^4
+    vg = sqrt(kB) * sqrt(3.0 / 2.0) * sin(sqrt(3.0) * k / 2.0)
     return (omega_sq=omega_sq, vg=vg)
 end
 
 function theory_dispersion(::Val{DirY}, ::Val{Trans}, k, kB, S)
-    s_half = sqrt(3.0) * k / 2.0
-    s_full = sqrt(3.0) * k
+    # from Eq S39
+    s_half = sin(sqrt(3.0) * k / 2.0)
+    c_half = cos(sqrt(3.0) * k / 2.0)
     
-    omega_sq = (4.0 / 3.0) * (2.0 - 3.0 * cos(s_half) + cos(s_full))
-    
+    omega_sq = 2.0 * kB * ( -(1.0 + S / 3.0) * s_half^2 + 2.0 * (1.0 - c_half) )
     omega = omega_sq > 1e-9 ? sqrt(omega_sq) : 0.0
     
-    vg_num = 3.0*sin(s_half) - 2.0*sin(s_full)
-    vg_den = sqrt(3.0) * omega
-    
-    vg = omega > 1e-9 ? vg_num / vg_den : 0.0
+    vg_num = sqrt(3.0) * kB * 2.0 * s_half * ( 1.0 - (1.0 + S / 3.0) * c_half )
+    vg = omega > 1e-9 ? vg_num / (2.0 * omega) : 0.0
     
     return (omega_sq=omega_sq, vg=vg)
 end
-
 
 function calc_theory(cfg::LinearConfig, dir, pol, k)
     return theory_dispersion(dir, pol, k, cfg.kB, cfg.S)
@@ -177,9 +185,9 @@ end
 
 Parallel driver to run all 4 combinations (XL, XT, YL, YT) for a set of S parameters.
 """
-function measure_all_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
+function measure_all_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2, S_values=[1.0, -1.0])
 
-    harmonic_configs= [LinearConfig(1.0, 1.0), LinearConfig(1.0, -1.0)]
+    harmonic_configs = [LinearConfig(1.0, S) for S in S_values]
     combinations = Iterators.product(
         [DirX, DirY], 
         [Long, Trans], 
@@ -326,8 +334,8 @@ end
 
 Parallel driver to run longitudinal combinations (XL, YL) with sliding boundaries.
 """
-function measure_sliding_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
-    harmonic_configs = [LinearConfig(1.0, 1.0), LinearConfig(1.0, -1.0)]
+function measure_sliding_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2, S_values=[1.0, -1.0])
+    harmonic_configs = [LinearConfig(1.0, S) for S in S_values]
     combinations = Iterators.product(
         [DirX, DirY], 
         harmonic_configs
@@ -448,8 +456,8 @@ end
 
 Parallel driver to run longitudinal combinations (XL, YL) with longitudinal constraint boundaries.
 """
-function measure_longitudinal_constraint_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
-    harmonic_configs = [LinearConfig(1.0, 1.0), LinearConfig(1.0, -1.0)]
+function measure_longitudinal_constraint_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2, S_values=[1.0, -1.0])
+    harmonic_configs = [LinearConfig(1.0, S) for S in S_values]
     combinations = Iterators.product(
         [DirX, DirY], 
         harmonic_configs
