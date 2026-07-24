@@ -21,7 +21,8 @@ function build_system(cfg::LinearConfig, nx::Int, ny::Int; sliding_dim::Int=0, l
 end
 
 function build_system(cfg::BistableConfig, nx::Int, ny::Int; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
-    return BistableWaveguideLattice(nx, ny, cfg.uA, cfg.uC; sliding_dim=sliding_dim, longitudinal_constraint_dim=longitudinal_constraint_dim)
+    Sxx_physical = cfg.S * cfg.kB / sqrt(3.0)
+    return BistableWaveguideLattice(nx, ny, cfg.uA, cfg.uC, cfg.kB, Sxx_physical; sliding_dim=sliding_dim, longitudinal_constraint_dim=longitudinal_constraint_dim)
 end
 
 """
@@ -208,10 +209,10 @@ function measure_all_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e
     println("All measurements complete.")
 end
 
-function measure_bistable_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2)
+function measure_bistable_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2, S_values=[1.0, -1.0])
 
     # uA and uC chosen so that δ ~ 0.75 of r0?
-    bistable_configs= [BistableConfig(0.0703125,0.7,1.0, 1.0)]
+    bistable_configs = [BistableConfig(0.0703125, 0.7, 1.0, S) for S in S_values]
     combinations = Iterators.product(
         [DirX, DirY], 
         [Long, Trans], 

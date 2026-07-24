@@ -126,7 +126,7 @@ function WaveguideLattice(nx, ny, kB, Sxx; sliding_dim::Int=0, longitudinal_cons
     kA = -kB / 2
     kC = -kB / 2
     rB = 0.0
-    rA = Sxx / kB
+    rA = Sxx * sqrt(3.0) / kB
     rC = -rA / sqrt(3.0)
 
     springA = HarmonicSpring(kA, rA)
@@ -204,17 +204,17 @@ We assume kB = Sxx = 1, and choose the B bond to be a normal harmonic spring.
 We parameterize the A and C bistable springs in terms of the energy well depth of the bistable potential.
 Returns `(system, calculator)`.
 """
-function BistableWaveguideLattice(nx, ny, uA, uC; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
+function BistableWaveguideLattice(nx, ny, uA, uC, kB, Sxx; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
     if !iseven(ny)
         ny += 1
     end
-    kB = 1.0
     rB = 0.0
 
-    r0A = 1.0
+    r0A = Sxx * sqrt(3.0) / kB
     deltaA = 2.0 * sqrt(2.0*uA)
 
-    #positive-delta solution for linearization of C bond about sqrt(3)
+    # TODO: This c_bond_helper is hardcoded for kB=1, S=1. It needs to be updated!
+    # positive-delta solution for linearization of C bond about sqrt(3)
     function c_bond_helper(u) # bizarre result is an automated common sub-expr reduction
         c225 = u^3
         c226 = 4.0*u
