@@ -11,8 +11,8 @@ end
 struct BistableConfig <: AbstractSystemConfig
     uA::Float64
     uC::Float64
-    kB::Float64 # need to use default = 1.0 for now
-    S::Float64 # need to use default = 1.0 for now
+    kB::Float64
+    S::Float64 
 end
 
 function build_system(cfg::LinearConfig, nx::Int, ny::Int; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
@@ -211,7 +211,7 @@ end
 
 function measure_bistable_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-2, S_values=[1.0, -1.0])
 
-    # uA and uC chosen so that δ ~ 0.75 of r0?
+    # uA and uC chosen so that δ is a fraction of r0 when S ~ 1
     bistable_configs = [BistableConfig(0.0703125, 0.7, 1.0, S) for S in S_values]
     combinations = Iterators.product(
         [DirX, DirY], 

@@ -85,3 +85,64 @@ function potential_energy(s::BistableQuarticSpring, r_vector)
     dr = (r_dist - s.r0)
     return s.k4*dr*dr*dr*dr - s.k2*dr*dr
 end
+
+"""
+    match_bistable_to_harmonic(L, K, F, u)
+
+Solve the cubic equation to find (r0, delta) that match a harmonic spring's
+stiffness (K) and force (F) at a specific lattice distance (L). The well depth,
+u, is a free parameter.
+"""
+function match_bistable_to_harmonic(L, K, F, u)
+    if abs(F) < 1e-12
+        return L, sqrt(-4.0 * u / K)
+    end
+
+    a = K^2
+    b = -6.0 * K * F
+    c = 9.0 * F^2 - 8.0 * u * K
+    d_coef = 8.0 * u * F
+
+    p = (3.0 * a * c - b^2) / (3.0 * a^2)
+    q = (2.0 * b^3 - 9.0 * a * b * c + 27.0 * a^2 * d_coef) / (27.0 * a^3)
+
+    Delta = (q / 2.0)^2 + (p / 3.0)^3
+
+    xs = Float64[]
+    if Delta <= 0
+        # use trig if there are three real roots 
+        r = sqrt(-(p / 3.0)^3)
+        theta = acos(-q / (2.0 * r))
+        push!(xs, 2.0 * cbrt(r) * cos(theta / 3.0) - b / (3.0 * a))
+        push!(xs, 2.0 * cbrt(r) * cos((theta + 2.0 * pi) / 3.0) - b / (3.0 * a))
+        push!(xs, 2.0 * cbrt(r) * cos((theta + 4.0 * pi) / 3.0) - b / (3.0 * a))
+    else
+        # otherwise Cardano gives us ne real root
+        u_p = cbrt(-q / 2.0 + sqrt(Delta))
+        v_p = cbrt(-q / 2.0 - sqrt(Delta))
+        push!(xs, u_p + v_p - b / (3.0 * a))
+    end
+
+    valid_roots = Float64[]
+    for x in xs
+        denom = K * x - 3.0 * F
+        if abs(denom) > 1e-12
+            d2 = 8.0 * u * x / denom
+            if d2 > 0
+                push!(valid_roots, x)
+            end
+        end
+    end
+
+    if isempty(valid_roots)
+        error("No valid matching bistable spring parameters found for K=$K, F=$F, u=$u")
+    end
+
+    positive_roots = filter(x -> x > 0, valid_roots)
+    x_sol = isempty(positive_roots) ? minimum(valid_roots) : minimum(positive_roots)
+
+    r0 = L - x_sol
+    delta = sqrt(8.0 * u * x_sol / (K * x_sol - 3.0 * F))
+
+    return r0, delta
+end

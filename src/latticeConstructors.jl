@@ -208,34 +208,22 @@ function BistableWaveguideLattice(nx, ny, uA, uC, kB, Sxx; sliding_dim::Int=0, l
     if !iseven(ny)
         ny += 1
     end
+    # these are the harmonic properties we're trying to emulate
+    kA = -kB / 2
+    kC = -kB / 2
     rB = 0.0
+    rA_harm = Sxx * sqrt(3.0) / kB
+    rC_harm = -rA_harm / sqrt(3.0)
 
-    r0A = Sxx * sqrt(3.0) / kB
-    deltaA = 2.0 * sqrt(2.0*uA)
+    # relevant lattice distances and target forces
+    L_A = 1.0
+    L_C = sqrt(3.0)
+    
+    F_A = kA * (L_A - rA_harm)
+    F_C = kC * (L_C - rC_harm)
 
-    # TODO: This c_bond_helper is hardcoded for kB=1, S=1. It needs to be updated!
-    # positive-delta solution for linearization of C bond about sqrt(3)
-    function c_bond_helper(u) # bizarre result is an automated common sub-expr reduction
-        c225 = u^3
-        c226 = 4.0*u
-        c227 = -3.0 + c226
-        c228 = u*c227
-        c229 = 24.0 + c228
-        c230 = c225*c229
-        c238 = sqrt(c230)
-        c222 = u*u
-        c223 = 9.0 + u
-        c224 = c222*c223
-        c239 = 3.0*c238
-        c240 = c224 + c239
-        c243 = c240^(1/3)
-        c249 = c240^(2/3)
-        r0=(-14.0*c225 + 2.0*c238*c243 + 2.0*c222*(12.0 + 5.0*c243) - u*(2.0*c238 + 5.0*c249))/(sqrt(3.0)*u*c249)
-        delta=  2.0*sqrt(2.0)*sqrt((c222 + c249 - u*(6.0 + c243))/c243)
-
-        return (r0,delta)
-    end
-    (r0C, deltaC) = c_bond_helper(uC)
+    (r0A, deltaA) = match_bistable_to_harmonic(L_A, kA, F_A, uA)
+    (r0C, deltaC) = match_bistable_to_harmonic(L_C, kC, F_C, uC)
 
     springA = BistableQuarticSpring(r0A, deltaA, uA)
     springB = HarmonicSpring(kB, rB)
