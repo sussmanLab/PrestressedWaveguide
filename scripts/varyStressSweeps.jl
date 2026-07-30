@@ -13,17 +13,17 @@ const N_PRIMARY = 200
 const N_SECONDARY = 20
 const AMPLITUDE = 1e-2
 const DT = 1e-3
-const S_VALUES = [1.0, 0.1, 0.01, 0.001]
+const S_VALUES = [1.0, 0.3, 0.1, 0.03, 0.01, 0.001, 0.0001]
 
 """
-    compute_bistable_u(L, K, F; target_ratio=0.75)
+    compute_bistable_u(L, K, F; target_ratio=0.9)
 
 Calculates the required bistable potential depth `u` to match a specific 
 length (L), stiffness (K), and force (F), while guaranteeing that the 
 separation delta remains a safe fraction of the central distance r0 
 (defaulting to 75%).
 """
-function compute_bistable_u(L, K, F; target_ratio=0.75)
+function compute_bistable_u(L, K, F; target_ratio=0.9)
     if abs(F) < 1e-12
         return (target_ratio * L)^2 * (-K) / 4.0
     end
