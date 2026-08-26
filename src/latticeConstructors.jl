@@ -334,6 +334,27 @@ function imposeTravelingWave!(system::ParticleSystem{D,T,B}, modeIndexX, modeInd
 end
 
 """
+    imposeSpinWave!(system, modeIndexX, A,  omega)
+
+Modifies positions and velocities to set up an x-propagating circularly polarized wave.
+Note this only works for S=0.
+"""
+function imposeSpinWave!(system::ParticleSystem{D,T,B}, modeIndexX, A, omega) where {D,T,B}
+    L = system.boundary_conditions.box_dimensions
+    
+    qx = 2.0 * pi * modeIndexX / L[1]
+
+    for i in eachindex(system.particles)
+        p = system.particles[i]
+        phase = qx * p.position[1]
+        displacement = SVector{D,T}(A * cos(phase), A * sin(phase))
+        new_position = p.position + displacement
+        new_velocity = SVector{D,T}(omega * A * sin(phase), -omega * A * cos(phase))
+        system.particles[i] = Particle(new_position, new_velocity, p.mass)
+    end
+end
+
+"""
     imposeTravelingWavePacket!(system, modeIndexX, modeIndexY, Ax, Ay, omega, sigmaX, sigmaY)
 
 Modifies positions and velocities to set up a Gaussian wave packet centered in the box.
