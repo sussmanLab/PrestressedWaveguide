@@ -13,9 +13,9 @@ const NX = 60
 const NY = 20          
 const KB = 1.0          
 const SXX = 0.0         
-const DT = 0.001      
-const FRAMES = 20     
-const STEPS_PER_FRAME = 100 
+const DT = 0.01      
+const FRAMES = 200     
+const STEPS_PER_FRAME = 500 
 
 const MODE_q = 3.0      
 const AMP = 0.01        
@@ -49,7 +49,6 @@ function animateSpinWave_experiment()
     
     sys_config= PrestressedWaveguide.LinearConfig(KB, SXX)
     sys, calc = PrestressedWaveguide.build_system(sys_config, NX, NY)
-    integrator = VerletIntegrator(sys, calc)
 
     L_dims = sys.boundary_conditions.box_dimensions
     k = 2 * pi * MODE_q / L_dims[1]
@@ -57,12 +56,13 @@ function animateSpinWave_experiment()
     # from Eq. S52,53 when S=0
     s_half = sin(k / 2.0)
     c_half = cos(k / 2.0)
-    omega_sq = 2.0 * kB * ( -s_half^2 + 2.0 * (1.0 - c_half) )
+    omega_sq = 2.0 * KB * ( -s_half^2 + 2.0 * (1.0 - c_half) )
     omega = sqrt(omega_sq)
     
     println("Imposing Spin Wave (k=$k, ω=$omega)...")
     
     imposeSpinWave!(sys, MODE_q, AMP, omega)
+    integrator = VerletIntegrator(sys, calc)
 
     println("Setting up GLMakie...")
     
@@ -86,9 +86,8 @@ function animateSpinWave_experiment()
     sc = scatter!(ax, points_obs, 
              color = colors_obs, 
              colormap = :RdBu, 
-             colorrange = (-AMP, AMP),
+             colorrange = (-AMP * omega, AMP * omega), # the other script should probably be this, too -- map colors to velocity instead of displacement
              markersize = 8)
-
     Colorbar(fig[1, 2], sc, label = "vertical velocity (vy)")
 
     println("Starting Recording...")
