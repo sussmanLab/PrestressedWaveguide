@@ -18,7 +18,7 @@ const FRAMES = 200
 const STEPS_PER_FRAME = 500 
 
 const MODE_q = 3.0      
-const AMP = 0.01        
+const AMP = 0.2        
 
 """
 Helper function to get bond segments for plotting.
