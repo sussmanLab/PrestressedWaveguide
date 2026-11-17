@@ -1,6 +1,3 @@
-""" 
-A particle has mass, along with a D-dimensional position and velocity.
-"""
 struct Particle{D,T}
     position::SVector{D,T}
     velocity::SVector{D,T}

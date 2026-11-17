@@ -1,3 +1,8 @@
+#=
+This set of integrators was copied over from DMS' ComputationalMechanics repo,
+hence there is more than we need / actually use in the paper
+=#
+
 abstract type AbstractIntegrator end
 
 struct ForwardEuler{D,T} <: AbstractIntegrator 

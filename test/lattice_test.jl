@@ -61,7 +61,7 @@ end
     
     @test norm(p_center.velocity) < 1e-10
     
-    p_edge = system.particles[1] # Originally at (0,0)
+    p_edge = system.particles[1]
     
     @test p_edge.position[1] ≈ 0.0 atol=1e-10
     @test p_edge.position[2] ≈ 0.0 atol=1e-10

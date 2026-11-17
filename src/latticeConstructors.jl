@@ -1,6 +1,6 @@
 using LinearAlgebra
 
-# Standard triangular lattice vectors
+# standard triangular lattice vectors
 const A1_vec = SVector{2,Float64}(1.0, 0.0)
 const A2_vec = SVector{2,Float64}(0.5, 0.5 * sqrt(3.0))
 
@@ -52,7 +52,6 @@ Forces `ny` to be even for consistent staggering.
 Returns `(system, calculator)`.
 """
 function SimpleTriangularLattice(nx, ny)
-    # Ensure even number of rows for periodicity consistency
     if !iseven(ny)
         ny += 1
     end
@@ -89,16 +88,16 @@ function SimpleTriangularLattice(nx, ny)
     for j in 1:ny
         for i in 1:nx
             current_idx = to_idx(i, j)
-            # Nearest Neighbors (Horizontal)
+            # nearest neighbors (horizontal)
             conditional_add_bond!(bonds, current_idx, to_idx(i + 1, j), standard_spring)
             conditional_add_bond!(bonds, current_idx, to_idx(i - 1, j), standard_spring)
-            # Nearest Neighbors (Diagonals)
-            if isodd(j) # Rows generated with no x-offset
+            # nearest neighbors (diagonals)
+            if isodd(j) # rows generated with no x-offset
                 conditional_add_bond!(bonds, current_idx, to_idx(i - 1, j - 1), standard_spring)
                 conditional_add_bond!(bonds, current_idx, to_idx(i,     j - 1), standard_spring)
                 conditional_add_bond!(bonds, current_idx, to_idx(i - 1, j + 1), standard_spring)
                 conditional_add_bond!(bonds, current_idx, to_idx(i,     j + 1), standard_spring)
-            else # iseven(j) -> Rows generated with x-offset
+            else # iseven(j) -> rows generated with x-offset
                 conditional_add_bond!(bonds, current_idx, to_idx(i,     j - 1), standard_spring)
                 conditional_add_bond!(bonds, current_idx, to_idx(i + 1, j - 1), standard_spring)
                 conditional_add_bond!(bonds, current_idx, to_idx(i,     j + 1), standard_spring)
@@ -112,12 +111,17 @@ end
 
 
 """
-    WaveguideLattice(nx, ny, kB, Sxx)
+    WaveguideLattice(nx, ny, kB, Sxx; sliding_dim=0, longitudinal_constraint_dim=0)
 
-Creates a triangular lattice with specific prestressed bonds (A, B, C) 
-(all harmonic springs)
-assigned based on spatial orientation.
-Returns `(system, calculator)`.
+Constructs a 2D triangular lattice (lattice constant a = 1, particle mass m = 1)
+with harmonic A, B, and C bonds tuned to the constitutively odd state.
+
+# Arguments
+- `nx::Int, ny::Int`: Number of unit cells in x and y (`ny` is forced to be even).
+- `kB::Real`: Stiffness of the diagonal B bonds.
+- `Sxx::Real`: Physical Cauchy prestress (related to dimensionless S by `Sxx = S * kB / √3`).
+- `sliding_dim::Int=0`: If 1 or 2, applies sliding waveguide boundaries along that axis.
+- `longitudinal_constraint_dim::Int=0`: If 1 or 2, restricts velocity to that axis.
 """
 function WaveguideLattice(nx, ny, kB, Sxx; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
     if !iseven(ny)
@@ -177,16 +181,16 @@ function WaveguideLattice(nx, ny, kB, Sxx; sliding_dim::Int=0, longitudinal_cons
         for j in i+1:N
             dr = box_displacement(bc, particles[i].position, particles[j].position)
 
-            # Horizontal (Type A)
+            # horizontal (Type A)
             if is_bond_vector(dr, HORIZONTAL_BOND_VEC)
                 push!(bonds, Bond(i, j, springA))
             
-            # Diagonals (Type B)
+            # diagonals (Type B)
             elseif is_bond_vector(dr, POSITIVE_DIAGONAL_BOND_VEC) || 
                    is_bond_vector(dr, NEGATIVE_DIAGONAL_BOND_VEC)
                 push!(bonds, Bond(i, j, springB))
             
-            # Vertical NNN (Type C)
+            # vertical NNN (Type C)
             elseif is_bond_vector(dr, VERTICAL_NNN_BOND_VEC)
                 push!(bonds, Bond(i, j, springC))
             end
@@ -197,13 +201,13 @@ function WaveguideLattice(nx, ny, kB, Sxx; sliding_dim::Int=0, longitudinal_cons
 end
 
 """
-    BistableWaveguideLattice(nx, ny, kB, Sxx)
+    BistableWaveguideLattice(nx, ny, uA, uC, kB, Sxx; sliding_dim=0, longitudinal_constraint_dim=0)
 
-Creates a triangular lattice with a mixture of harmonic springs and bistable springs, where the bistable springs have been chosen so that their linearization agrees with that of the WaveguideLattice above.
-We assume kB = Sxx = 1, and choose the B bond to be a normal harmonic spring. 
-We parameterize the A and C bistable springs in terms of the energy well depth of the bistable potential.
-Returns `(system, calculator)`.
+Constructs a triangular waveguide lattice where the negative-stiffness A and C bonds
+are replaced by `BistableQuarticSpring` elements with well depths `uA` and `uC`,
+matched to the target force and incremental stiffness at the equilibrium bond lengths.
 """
+function BistableWaveguideLattice(nx, ny, uA, uC, kB, Sxx; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
 function BistableWaveguideLattice(nx, ny, uA, uC, kB, Sxx; sliding_dim::Int=0, longitudinal_constraint_dim::Int=0)
     if !iseven(ny)
         ny += 1
@@ -273,16 +277,16 @@ function BistableWaveguideLattice(nx, ny, uA, uC, kB, Sxx; sliding_dim::Int=0, l
         for j in i+1:N
             dr = box_displacement(bc, particles[i].position, particles[j].position)
 
-            # Horizontal (Type A)
+            # horizontal (Type A)
             if is_bond_vector(dr, HORIZONTAL_BOND_VEC)
                 push!(bonds, Bond(i, j, springA))
             
-            # Diagonals (Type B)
+            # diagonals (Type B)
             elseif is_bond_vector(dr, POSITIVE_DIAGONAL_BOND_VEC) || 
                    is_bond_vector(dr, NEGATIVE_DIAGONAL_BOND_VEC)
                 push!(bonds, Bond(i, j, springB))
             
-            # Vertical NNN (Type C)
+            # vertical NNN (Type C)
             elseif is_bond_vector(dr, VERTICAL_NNN_BOND_VEC)
                 push!(bonds, Bond(i, j, springC))
             end

@@ -85,8 +85,8 @@ end
 """
     measure_qx_fluxes(; kwargs...)
 
-Custom parallel driver to run only the DirX (qx) combinations for both 
-Longitudinal and Transverse polarizations, for both Harmonic and Bistable lattices.
+Run only the DirX (qx) combinations for both Longitudinal and Transverse polarizations,
+    for both Harmonic and Bistable lattices.
 """
 function measure_qx_fluxes(; nPrimary=200, nSecondary=20, amplitude=1e-2, dt=1e-3, S_values=[1.0, -1.0])
     

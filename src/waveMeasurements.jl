@@ -1,11 +1,5 @@
-"""
-    average_energy_density(system, calculator)
-
-Calculates the total energy  per unit area.
-"""
 function average_energy_density(system::ParticleSystem{D,T,BC}, calculator) where {D, T,BC}
     volume = prod(system.boundary_conditions.box_dimensions)
-    
     return total_energy(system,calculator) / volume
 end
 
@@ -129,19 +123,20 @@ end
 
 
 """
-    measure_wave_properties(system, calculator, integrator, params...)
+    measure_wave_properties(system, force_calculator, integrator, modeIndexX, modeIndexY, Ax, Ay, omega, tMeasurement, dt; tSettle=20.0)
 
-Runs the measurement simulation.
+Imposes a traveling plane wave with integer mode numbers `(modeIndexX, modeIndexY)`,
+amplitudes `(Ax, Ay)`, and angular frequency `omega`, then integrates for `tMeasurement`
+(after an optional `tSettle` equilibration period).
+
+Returns a NamedTuple with time-averaged fields:
+- `energy_current_density`: 2D Irving-Kirkwood energy flux vector across the box midlines.
+- `energy_density`: Excess total energy per unit area relative to the ground state.
+- `momentum_density`: 2D pseudomomentum per unit area.
+- `group_velocity`: Ratio of `energy_current_density` to `energy_density`.
 """
-function measure_wave_properties(
-    system::ParticleSystem{D,T,BC}, 
-    force_calculator, 
-    integrator,
-    modeIndexX, modeIndexY, 
-    Ax, Ay, omega,
-    tMeasurement, dt; 
-    tSettle=20.0
-) where {D,T,BC}
+function measure_wave_properties( system::ParticleSystem{D,T,BC}, force_calculator, integrator,
+    modeIndexX, modeIndexY, Ax, Ay, omega, tMeasurement, dt; tSettle=20.0) where {D,T,BC}
 
     pm_calc = PseudomomentumCalculator(system, force_calculator)
     ground_state_energy_density = average_energy_density(system, force_calculator)

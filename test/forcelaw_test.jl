@@ -5,7 +5,7 @@
         r0 = 1.0
         spring = HarmonicSpring(k, r0)
 
-        r_vec = SVector(1.0, 0.0) # Magnitude 1.0
+        r_vec = SVector(1.0, 0.0) 
         f = spring_force(spring, r_vec)
         @test norm(f) ≈ 0.0 atol=1e-12
 

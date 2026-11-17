@@ -16,5 +16,3 @@ const testsToRun = isempty(ARGS) ? allTests : ARGS
         include("$(test).jl")
     end
 end
-
-

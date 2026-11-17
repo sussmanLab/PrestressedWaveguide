@@ -3,6 +3,12 @@
 
 abstract type AbstractSystemConfig end
 
+"""
+    LinearConfig(kB, S)
+
+Configuration for a harmonic waveguide lattice with diagonal bond stiffness `kB`
+and dimensionless prestress `S = √3 * Sxx / kB`.
+"""
 struct LinearConfig <: AbstractSystemConfig
     kB::Float64
     S::Float64
@@ -85,6 +91,7 @@ end
 function get_param_str(cfg::BistableConfig)
     return "Bistable_S$(cfg.S)"
 end
+
 """
     run_dispersion_sweep(nPrimary, nSecondary, direction, polarization; kwargs...)
 

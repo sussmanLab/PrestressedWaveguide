@@ -1,8 +1,6 @@
 @testset "Integrators" begin
 
-    @testset "Verlet Energy Conservation" begin
-        # 1D Oscillation Setup: 2 particles and a spring
-        # Two particles connected by a spring
+    @testset "Verlet Energy Conservation for oscillator" begin
         p1 = Particle(SVector(0.0, 0.0), SVector(0.0, 0.0), 1.0)
         p2 = Particle(SVector(2.0, 0.0), SVector(0.0, 0.0), 1.0)
         

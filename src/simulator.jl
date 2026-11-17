@@ -1,13 +1,8 @@
 """
     run_simulation!(system, force_calculator, integrator, dt, num_steps; callback, every_n_steps=1)
 
-Runs a complete N-body simulation for a specified number of discrete time steps.
-
-This is the main simulation loop. It repeatedly calls the `integrate!` method,
-which dispatches on the provided `integrator` type to advance the `system` state.
-The `system` object is mutated in-place over the course of the simulation.
-Meanwhile, a `callback` function whose signature must be `f(system,step_number)` is called every `every_n_steps`.
-By default, a no-op function is used as the callback at every step
+Runs an N-body simulation for a specified number of discrete time steps, with
+an optional (default = no-op) callback function every specified number of steps. 
 
 # Arguments
 - `system::System{D,T}`: The system of particles to be simulated. This object is mutated.
